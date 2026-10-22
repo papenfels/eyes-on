@@ -1,3 +1,5 @@
+Disclaimer: Everything below and the whole repository is written by AI.
+
 # eyes-on 👁️
 
 Real-time face detection focus monitor with vocal alerts. Built for ADHD, impulsive behavior, and distraction management.
@@ -53,11 +55,11 @@ In an era where AI increasingly personalizes to individual needs, this tool embr
 ### Infrastructure
 
 ```
-┌─ Browser (192.168.178.200)
+┌─ Browser
 │  └─ Webcam capture → canvas → JPEG base64
 │     └─ POST /detect → alert logic + audio
 │
-└─ Flask Server (192.168.178.201:5001)
+└─ Flask Server
    ├─ /detect: Face detection + alert level calculation
    ├─ /alert/<level>: Rotated audio stream (GET)
    ├─ /control: Start/stop monitoring
