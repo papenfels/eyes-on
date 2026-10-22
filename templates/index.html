@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Focus Guard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif;
+      background: #f5f5f7;
+      color: #1d1d1f;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    body.dark { background: #000; color: #f5f5f7; }
+
+    .container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .strip {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .title {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .header-icons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.07);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    body.dark .icon-btn { background: rgba(255,255,255,0.12); }
+    .icon-btn:hover { background: rgba(0,0,0,0.13); }
+    body.dark .icon-btn:hover { background: rgba(255,255,255,0.2); }
+    .icon-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+    .video-wrap {
+      position: relative;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #e8e8ed;
+      border: 1px solid rgba(0,0,0,0.08);
+      min-height: 300px;
+    }
+    body.dark .video-wrap { background: #1c1c1e; border-color: rgba(255,255,255,0.12); }
+
+    #video {
+      width: 100%;
+      height: 300px;
+      object-fit: cover;
+      display: block;
+      transition: opacity 0.3s ease;
+    }
+    #video.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .video-placeholder {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 14px;
+      color: #86868b;
+      display: none;
+      white-space: nowrap;
+    }
+    .video-placeholder.show {
+      display: block;
+    }
+
+    .video-overlay-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    .video-overlay-btn:hover { background: rgba(0,0,0,0.55); }
+    .video-overlay-btn svg { width: 16px; height: 16px; fill: none; stroke: white; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 22px 24px;
+      border: 1px solid rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    body.dark .card { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.12); }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .row-label {
+      font-size: 15px;
+      color: #86868b;
+      font-weight: 500;
+    }
+    body.dark .row-label { color: #a1a1a6; }
+
+    .row-value {
+      font-size: 17px;
+      font-weight: 600;
+    }
+    .row-value.green { color: #34c759; }
+    .row-value.red   { color: #ff3b30; }
+    .row-value.muted { color: #86868b; }
+
+    .focus-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .focus-bar {
+      flex: 1;
+      height: 6px;
+      background: rgba(0,0,0,0.08);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    body.dark .focus-bar { background: rgba(255,255,255,0.12); }
+    .focus-bar-fill {
+      height: 100%;
+      background: #34c759;
+      border-radius: 3px;
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 14px;
+      border-radius: 14px;
+      border: none;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-gray { background: rgba(0,0,0,0.08); color: #1d1d1f; }
+    body.dark .btn-gray { background: rgba(255,255,255,0.13); color: #f5f5f7; }
+    .btn-gray:hover { background: rgba(0,0,0,0.12); }
+    body.dark .btn-gray:hover { background: rgba(255,255,255,0.2); }
+    .btn-pause-active { background: #ff9500 !important; color: #fff !important; }
+
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal.open { display: flex; }
+
+    .modal-box {
+      background: #fff;
+      border-radius: 20px;
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+      max-height: 82vh;
+      overflow-y: auto;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+    }
+    body.dark .modal-box { background: #1c1c1e; }
+
+    .modal-head {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-close {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.08);
+      border: none;
+      font-size: 17px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    body.dark .modal-close { background: rgba(255,255,255,0.12); color: #f5f5f7; }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #86868b;
+      margin: 20px 0 12px;
+    }
+    body.dark .section-title { color: #a1a1a6; }
+    .section-title:first-child { margin-top: 0; }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .slider-row label {
+      font-size: 14px;
+      min-width: 80px;
+      color: #1d1d1f;
+    }
+    body.dark .slider-row label { color: #f5f5f7; }
+    .slider-row input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 5px;
+      border-radius: 3px;
+      background: #e5e5ea;
+      outline: none;
+    }
+    body.dark .slider-row input[type=range] { background: rgba(255,255,255,0.15); }
+    .slider-row input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #007AFF;
+      cursor: pointer;
+    }
+    .slider-row input[type=range]::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #007AFF;
+      border: none;
+      cursor: pointer;
+    }
+    .slider-val {
+      min-width: 42px;
+      text-align: right;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 11px 0;
+      border-bottom: 1px solid rgba(0,0,0,0.07);
+      font-size: 14px;
+    }
+    body.dark .info-row { border-color: rgba(255,255,255,0.1); }
+    .info-row:last-child { border-bottom: none; }
+    .info-key { color: #86868b; }
+    body.dark .info-key { color: #a1a1a6; }
+    .info-val { font-weight: 600; }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+    }
+    .dot-green { background: #34c759; }
+    .dot-red { background: #ff3b30; }
+    .dot-gray { background: #86868b; }
+
+    audio { display: none; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="strip">
+    <div class="header">
+      <div class="title">Focus Guard</div>
+      <div class="header-icons">
+        <button class="icon-btn" id="infoBtn" title="Backend Info">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        </button>
+        <button class="icon-btn" id="settingsBtn" title="Einstellungen">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+        <button class="icon-btn" id="themeBtn" title="Tag/Nacht">
+          <svg id="iconMoon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg id="iconSun" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="video-wrap" id="videoWrap">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="video-placeholder" id="videoPlaceholder">Video ausgeblendet</div>
+      <button class="video-overlay-btn" id="videoToggleBtn" title="Video ein-/ausblenden">
+        <svg id="iconEye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg id="iconEyeOff" viewBox="0 0 24 24" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <span class="row-label">Status</span>
+        <span class="row-value muted" id="statusVal">Bereit</span>
+      </div>
+      <div class="row">
+        <span class="row-label">Alert Level</span>
+        <span class="row-value" id="levelVal">0</span>
+      </div>
+      <div class="row">
+        <span class="row-label">Focus Score</span>
+        <div class="focus-bar-wrap">
+          <div class="focus-bar"><div class="focus-bar-fill" id="focusFill"></div></div>
+          <span id="focusPct" style="font-size:14px;font-weight:600;">0%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-gray" id="pauseBtn">Pause</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="settingsModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      Einstellungen
+      <button class="modal-close" onclick="closeSettings()">&#x2715;</button>
+    </div>
+    <div class="section-title">Alert-Schwellwerte</div>
+    <div class="slider-row"><label>Level 1</label><input type="range" id="t1" min="1" max="180" value="2"><span class="slider-val" id="tv1">2s</span></div>
+    <div class="slider-row"><label>Level 2</label><input type="range" id="t2" min="1" max="180" value="5"><span class="slider-val" id="tv2">5s</span></div>
+    <div class="slider-row"><label>Level 3</label><input type="range" id="t3" min="1" max="180" value="15"><span class="slider-val" id="tv3">15s</span></div>
+    <div class="slider-row"><label>Level 4</label><input type="range" id="t4" min="1" max="180" value="30"><span class="slider-val" id="tv4">30s</span></div>
+    <div class="section-title">Abklingzeit</div>
+    <div class="slider-row"><label>Level 1</label><input type="range" id="c1" min="1" max="20" value="6"><span class="slider-val" id="cv1">6s</span></div>
+    <div class="slider-row"><label>Level 2</label><input type="range" id="c2" min="1" max="20" value="5"><span class="slider-val" id="cv2">5s</span></div>
+    <div class="slider-row"><label>Level 3</label><input type="range" id="c3" min="1" max="20" value="4"><span class="slider-val" id="cv3">4s</span></div>
+    <div class="slider-row"><label>Level 4</label><input type="range" id="c4" min="1" max="20" value="3"><span class="slider-val" id="cv4">3s</span></div>
+    <div class="section-title">Quiet Mode</div>
+    <div class="slider-row"><label>Max. Level</label><input type="range" id="qm" min="0" max="4" value="4"><span class="slider-val" id="qv">4</span></div>
+  </div>
+</div>
+
+<div class="modal" id="infoModal">
+  <div class="modal-box">
+    <div class="modal-head">Backend Info<button class="modal-close" onclick="closeInfo()">&#x2715;</button></div>
+    <div class="info-row"><span class="info-key">Server</span><span class="info-val">192.168.178.201:5001</span></div>
+    <div class="info-row"><span class="info-key">Protokoll</span><span class="info-val">HTTPS</span></div>
+    <div class="info-row"><span class="info-key">Backend</span><span class="info-val">Flask 3.1.3</span></div>
+    <div class="info-row"><span class="info-key">Gesichtserkennung</span><span class="info-val">OpenCV YuNet</span></div>
+    <div class="info-row"><span class="info-key">Stimme</span><span class="info-val">ElevenLabs Custom</span></div>
+    <div class="info-row"><span class="info-key">Audio-Dateien</span><span class="info-val">61 MP3</span></div>
+    <div class="info-row"><span class="info-key">Status</span><span class="info-val" id="srvStatus"><span class="status-dot dot-gray"></span>Prüfe...</span></div>
+  </div>
+</div>
+
+<audio id="alertAudio"></audio>
+
+<script>
+  const video = document.getElementById('video');
+  const cvs = document.createElement('canvas');
+  const cctx = cvs.getContext('2d');
+  const audio = document.getElementById('alertAudio');
+
+  let paused = false;
+  let videoOn = true;
+  let dark = localStorage.getItem('dark') === '1';
+  let quietMax = parseInt(localStorage.getItem('quietMax')) || 4;
+  let focusMs = 0;
+  let totalMs = 0;
+  let lastAlert = {};
+  let wasAway = false;
+
+  const T = { 1: ls('t1', 2), 2: ls('t2', 5), 3: ls('t3', 15), 4: ls('t4', 30) };
+  const C = { 1: ls('c1', 6)*1000, 2: ls('c2', 5)*1000, 3: ls('c3', 4)*1000, 4: ls('c4', 3)*1000 };
+
+  function ls(k, def) { return parseInt(localStorage.getItem(k)) || def; }
+
+  function applyTheme() {
+    document.body.classList.toggle('dark', dark);
+    document.getElementById('iconMoon').style.display = dark ? 'none' : '';
+    document.getElementById('iconSun').style.display = dark ? '' : 'none';
+  }
+  applyTheme();
+
+  document.getElementById('themeBtn').addEventListener('click', () => {
+    dark = !dark;
+    localStorage.setItem('dark', dark ? '1' : '0');
+    applyTheme();
+  });
+
+  document.getElementById('videoToggleBtn').addEventListener('click', () => {
+    videoOn = !videoOn;
+    // Video verstecken aber weiterhin laufen (für Gesichtserkennung)
+    document.getElementById('video').classList.toggle('hidden', !videoOn);
+    document.getElementById('videoPlaceholder').classList.toggle('show', !videoOn);
+    document.getElementById('iconEye').style.display = videoOn ? '' : 'none';
+    document.getElementById('iconEyeOff').style.display = videoOn ? 'none' : '';
+  });
+
+  document.getElementById('pauseBtn').addEventListener('click', () => {
+    paused = !paused;
+    const btn = document.getElementById('pauseBtn');
+    btn.textContent = paused ? 'Fortsetzen' : 'Pause';
+    btn.classList.toggle('btn-pause-active', paused);
+    fetch('/control', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ action: paused ? 'stop' : 'start' })
+    }).catch(()=>{});
+    if (!paused) document.getElementById('statusVal').textContent = 'Bereit';
+  });
+
+  document.getElementById('settingsBtn').addEventListener('click', openSettings);
+  document.getElementById('infoBtn').addEventListener('click', openInfo);
+
+  function openSettings() {
+    for (let i = 1; i <= 4; i++) {
+      document.getElementById('t'+i).value = T[i];
+      document.getElementById('tv'+i).textContent = T[i]+'s';
+      document.getElementById('c'+i).value = C[i]/1000;
+      document.getElementById('cv'+i).textContent = (C[i]/1000)+'s';
+    }
+    document.getElementById('qm').value = quietMax;
+    document.getElementById('qv').textContent = quietMax;
+    document.getElementById('settingsModal').classList.add('open');
+  }
+
+  function closeSettings() {
+    for (let i = 1; i <= 4; i++) {
+      T[i] = parseInt(document.getElementById('t'+i).value);
+      C[i] = parseInt(document.getElementById('c'+i).value) * 1000;
+      localStorage.setItem('t'+i, T[i]);
+      localStorage.setItem('c'+i, C[i]/1000);
+    }
+    quietMax = parseInt(document.getElementById('qm').value);
+    localStorage.setItem('quietMax', quietMax);
+    fetch('/settings', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ thresholds: T, cooldowns: C })
+    }).catch(()=>{});
+    document.getElementById('settingsModal').classList.remove('open');
+  }
+
+  document.querySelectorAll('#settingsModal input[type=range]').forEach(s => {
+    s.addEventListener('input', () => {
+      const id = s.id;
+      if (id.startsWith('t')) document.getElementById('tv'+id[1]).textContent = s.value+'s';
+      else if (id.startsWith('c')) document.getElementById('cv'+id[1]).textContent = s.value+'s';
+      else if (id === 'qm') document.getElementById('qv').textContent = s.value;
+    });
+  });
+
+  function openInfo() {
+    fetch('/settings').then(r => {
+      document.getElementById('srvStatus').innerHTML = '<span class="status-dot dot-green"></span>Online';
+    }).catch(() => {
+      document.getElementById('srvStatus').innerHTML = '<span class="status-dot dot-red"></span>Offline';
+    });
+    document.getElementById('infoModal').classList.add('open');
+  }
+
+  function closeInfo() {
+    document.getElementById('infoModal').classList.remove('open');
+  }
+
+  document.querySelectorAll('.modal').forEach(m => {
+    m.addEventListener('click', e => {
+      if (e.target === m) {
+        m.classList.remove('open');
+        if (m.id === 'settingsModal') closeSettings();
+      }
+    });
+  });
+
+  function playAudio(level) {
+    if (quietMax === 0) return;
+    // Comeback ist ein String, nicht ein Number
+    let route = level;
+    if (typeof level === 'number') {
+      route = Math.min(level, quietMax);
+    }
+    audio.src = '/alert/' + route + '?t=' + Date.now();
+    audio.load();
+    audio.play().catch(()=>{});
+  }
+
+  navigator.mediaDevices.getUserMedia({ video: { width: {ideal:1280}, height: {ideal:720} } })
+    .then(stream => {
+      video.srcObject = stream;
+      video.addEventListener('loadedmetadata', () => {
+        cvs.width = video.videoWidth;
+        cvs.height = video.videoHeight;
+        fetch('/control', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ action: 'start' })
+        }).then(() => detect());
+      });
+    })
+    .catch(() => {
+      document.getElementById('statusVal').textContent = 'Kamera blockiert';
+    });
+
+  async function detect() {
+    if (paused) {
+      setTimeout(detect, 200);
+      return;
+    }
+
+    cctx.drawImage(video, 0, 0, cvs.width, cvs.height);
+    const img = cvs.toDataURL('image/jpeg', 0.8);
+
+    try {
+      const res = await fetch('/detect', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ frame: img })
+      });
+      const data = await res.json();
+      const face = data.face === true;
+      const level = data.alert_level || 0;
+
+      totalMs += 200;
+      if (face) focusMs += 200;
+
+      const pct = totalMs > 0 ? Math.round((focusMs / totalMs) * 100) : 0;
+      document.getElementById('focusFill').style.width = pct + '%';
+      document.getElementById('focusPct').textContent = pct + '%';
+
+      const sv = document.getElementById('statusVal');
+      if (face) {
+        sv.textContent = 'Fokussiert';
+        sv.className = 'row-value green';
+      } else {
+        sv.textContent = 'Abgelenkt';
+        sv.className = 'row-value red';
+      }
+
+      document.getElementById('levelVal').textContent = level;
+
+      if (level > 0 && !lastAlert[level]) {
+        playAudio(level);
+        lastAlert[level] = Date.now();
+        wasAway = true;
+      }
+      if (face && wasAway && level === 0) {
+        playAudio('comeback');
+        wasAway = false;
+        lastAlert = {};
+      }
+      for (let l = 1; l <= 4; l++) {
+        if (lastAlert[l] && Date.now() - lastAlert[l] > C[l]) delete lastAlert[l];
+      }
+    } catch (e) {}
+
+    setTimeout(detect, 200);
+  }
+</script>
+</body>
+</html>
